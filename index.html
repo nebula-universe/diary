@@ -11,11 +11,12 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500&display=swap">
+  <!-- 字型不阻擋畫面：沒網路或很慢時先用手機內建字型 -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="app"></main>
+  <main id="app"><p style="text-align:center;color:#9a9893;padding-top:40vh">載入中…</p></main>
 
   <nav class="tabbar">
     <a href="#/" data-tab="list">
@@ -39,6 +40,16 @@
   </div>
   <div id="toast" hidden></div>
 
+  <script>
+    // 保險：12 秒後還在「載入中」就顯示重新載入按鈕
+    setTimeout(function () {
+      var a = document.getElementById('app');
+      if (a && a.textContent.trim() === '載入中…') {
+        a.innerHTML = '<div style="text-align:center;padding:30vh 20px 0;color:#9a9893">載入時間太久了。<br><br>' +
+          '<button style="padding:10px 20px" onclick="location.reload()">重新載入</button></div>';
+      }
+    }, 12000);
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 // 離線快取：修改任何檔案後，把版本號加 1，手機才會載入新版
-const CACHE = 'photo-diary-v2';
+const CACHE = 'photo-diary-v3';
 const FONT_CACHE = 'photo-diary-fonts';   // 字體另外存，更新版本時不會被清掉
 const ASSETS = [
   './',
@@ -35,7 +35,11 @@ self.addEventListener('fetch', event => {
         const cached = await cache.match(req);
         if (cached) return cached;
         try {
-          const res = await fetch(req);
+          // 最多等 5 秒，網路太慢就先放棄（會用手機內建字型）
+          const res = await Promise.race([
+            fetch(req),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+          ]);
           if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
           return res;
         } catch (_) {

@@ -46,7 +46,11 @@ let dbPromise = null;
 function openDB() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('資料庫開啟逾時，請把 App 完全關閉後再打開')), 10000);
       const req = indexedDB.open(DB_NAME, 1);
+      req.onblocked = () => reject(new Error('資料庫被另一個視窗占用，請關閉其他開著日記的分頁或視窗'));
+      req.addEventListener('success', () => clearTimeout(timer));
+      req.addEventListener('error', () => clearTimeout(timer));
       req.onupgradeneeded = () => {
         const s = req.result.createObjectStore(STORE, { keyPath: 'id' });
         s.createIndex('date', 'date');
@@ -181,7 +185,26 @@ window.addEventListener('hashchange', () => {
   route();
 });
 
+// 發生錯誤時直接顯示在畫面上，而不是停在空白頁
+function showFatal(err) {
+  console.error(err);
+  document.body.classList.remove('editing');
+  app.className = '';
+  app.innerHTML = `<div class="empty">
+    <div class="big">出了點問題</div>
+    <p>請把 App 完全關閉（從最近使用的 App 中滑掉）後再打開。<br>如果還是不行，請把下面這行文字截圖給我。</p>
+    <p class="small" style="word-break:break-all;color:var(--danger)">${esc((err && (err.message || err.name)) || err)}</p>
+    <button class="btn" onclick="location.reload()">重新載入</button>
+  </div>`;
+}
+window.addEventListener('error', ev => { if (!app.querySelector('.story, .cal-grid, .field, .stat')) showFatal(ev.error || ev.message); });
+window.addEventListener('unhandledrejection', ev => { if (!entries) showFatal(ev.reason); });
+
 async function route() {
+  try { await routeInner(); } catch (err) { showFatal(err); }
+}
+
+async function routeInner() {
   leaveGuard = null;
   currentHash = location.hash;
   freeUrls();
@@ -680,7 +703,7 @@ async function renderSettings() {
 
     <section class="section">
       <div class="kicker">About</div><h2>關於</h2>
-      <p>照片日記 v2　·　所有資料只存在這部手機，不會上傳到任何地方。</p>
+      <p>照片日記 v3　·　所有資料只存在這部手機，不會上傳到任何地方。</p>
       <p id="persist"></p>
     </section>`;
 
