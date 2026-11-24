@@ -1,5 +1,5 @@
-// 離線快取：修改任何檔案後，把版本號加 1，手機才會載入新版
-const CACHE = 'photo-diary-v3';
+﻿// 離線快取：修改任何檔案後，把版本號加 1，手機才會載入新版
+const CACHE = 'photo-diary-v4';
 const FONT_CACHE = 'photo-diary-fonts';   // 字體另外存，更新版本時不會被清掉
 const ASSETS = [
   './',

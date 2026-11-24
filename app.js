@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /* =========================================================
  * 照片日記 — 所有資料只存在這部手機的瀏覽器 (IndexedDB) 裡
  * ========================================================= */
@@ -371,9 +371,11 @@ function renderCalendar() {
   app.innerHTML = `
     <div class="cal-head">
       <button class="iconbtn" data-nav="-1" aria-label="上個月">${ICON.back}</button>
-      <div class="t"><span class="kicker y">${MONTH_EN[m]} ${y}</span><span class="m">${y}年${m + 1}月</span></div>
+      <button class="t" aria-label="選擇月份" aria-expanded="false"><span class="kicker y">${MONTH_EN[m]} ${y}</span><span class="m">${y}年${m + 1}月<span class="caret">▾</span></span></button>
       <button class="iconbtn" data-nav="1" aria-label="下個月">${ICON.next}</button>
     </div>
+    <div class="mpick" hidden></div>
+    ${(y !== now.getFullYear() || m !== now.getMonth()) ? `<div class="cal-today"><button class="linkbtn" data-today>回到本月</button></div>` : ''}
     <div class="cal-grid">${cells}</div>
     <p class="kicker cal-count">${count} 篇日記</p>
     <div id="day-detail"></div>`;
@@ -389,12 +391,64 @@ function renderCalendar() {
   };
   showDay();
 
-  app.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
-    calState.m += Number(b.dataset.nav);
-    if (calState.m < 0) { calState.m = 11; calState.y--; }
-    if (calState.m > 11) { calState.m = 0; calState.y++; }
-    route();
-  }));
+  const go = (ny, nm) => { calState.y = ny; calState.m = nm; route(); };
+  const step = dir => {
+    let nm = calState.m + dir, ny = calState.y;
+    if (nm < 0) { nm = 11; ny--; }
+    if (nm > 11) { nm = 0; ny++; }
+    go(ny, nm);
+  };
+  app.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => step(Number(b.dataset.nav))));
+  app.querySelector('[data-today]')?.addEventListener('click', () => go(now.getFullYear(), now.getMonth()));
+
+  // 點標題：跳出年份＋12 個月，直接選
+  const picker = app.querySelector('.mpick');
+  const title = app.querySelector('.cal-head .t');
+  const counts = {};
+  for (const e of entries) { const k = e.date.slice(0, 7); counts[k] = (counts[k] || 0) + 1; }
+  let py = y;
+  const drawPicker = () => {
+    const nowKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    // 有寫日記的年份＋今年，排成一排可以直接點（寫很多年也不用一直按）
+    const yc = {};
+    for (const k in counts) { const yy = Number(k.slice(0, 4)); yc[yy] = (yc[yy] || 0) + counts[k]; }
+    const years = [...new Set([...Object.keys(yc).map(Number), now.getFullYear(), py])].sort((a, b) => b - a);
+    picker.innerHTML = `
+      ${years.length > 1 ? `<div class="mp-years">${years.map(yy =>
+        `<button class="mp-yc ${yy === py ? 'on' : ''}" data-yy="${yy}">${yy}<small>${yc[yy] ? yc[yy] + ' 篇' : ''}</small></button>`).join('')}</div>` : ''}
+      <div class="mp-year">
+        <button class="iconbtn" data-py="-1" aria-label="前一年">${ICON.back}</button>
+        <span class="mp-y">${py}</span>
+        <button class="iconbtn" data-py="1" aria-label="後一年">${ICON.next}</button>
+      </div>
+      <div class="mp-grid">${Array.from({ length: 12 }, (_, i) => {
+        const key = `${py}-${pad(i + 1)}`;
+        const n = counts[key] || 0;
+        const cls = ['mp-m', py === y && i === m ? 'on' : '', key === nowKey ? 'now' : '', n ? 'has' : ''].join(' ');
+        return `<button class="${cls}" data-pm="${i}"><span>${i + 1}月</span><small>${n ? n + ' 篇' : '　'}</small></button>`;
+      }).join('')}</div>`;
+    picker.querySelectorAll('[data-py]').forEach(b => b.addEventListener('click', () => { py += Number(b.dataset.py); drawPicker(); }));
+    picker.querySelectorAll('[data-yy]').forEach(b => b.addEventListener('click', () => { py = Number(b.dataset.yy); drawPicker(); }));
+    picker.querySelector('.mp-yc.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    picker.querySelectorAll('[data-pm]').forEach(b => b.addEventListener('click', () => go(py, Number(b.dataset.pm))));
+  };
+  title.addEventListener('click', () => {
+    const open = picker.hidden;
+    if (open) { py = calState.y; drawPicker(); }
+    picker.hidden = !open;
+    title.setAttribute('aria-expanded', String(open));
+  });
+
+  // 在月曆上左右滑動也能換月
+  const grid = app.querySelector('.cal-grid');
+  let sx = null, sy = null;
+  grid.addEventListener('touchstart', ev => { sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
+  grid.addEventListener('touchend', ev => {
+    if (sx === null) return;
+    const dx = ev.changedTouches[0].clientX - sx, dy = ev.changedTouches[0].clientY - sy;
+    sx = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
   app.querySelectorAll('.dayc[data-date]').forEach(b => b.addEventListener('click', () => {
     calState.sel = b.dataset.date;
     app.querySelectorAll('.dayc.sel').forEach(x => x.classList.remove('sel'));
@@ -703,7 +757,7 @@ async function renderSettings() {
 
     <section class="section">
       <div class="kicker">About</div><h2>關於</h2>
-      <p>照片日記 v3　·　所有資料只存在這部手機，不會上傳到任何地方。</p>
+      <p>照片日記 v4　·　所有資料只存在這部手機，不會上傳到任何地方。</p>
       <p id="persist"></p>
     </section>`;
 
